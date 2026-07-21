@@ -1,7 +1,5 @@
 name: Build and Publish package
-
 on: workflow_dispatch
-
 jobs:
   telegram-bot-api:
     permissions: write-all
@@ -11,17 +9,28 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Install Dependencies
-      run: sudo apt update && sudo apt-get install -y zip libssl-dev zlib1g-dev g++ gperf cmake
+      run: |
+        sudo apt update
+        sudo apt-get install -y zip libssl-dev zlib1g-dev g++ gperf cmake
 
-    - name: Clone repo, Configure and build
+    - name: Clone repo, Configure and build (static)
       run: |
         git clone --recursive https://github.com/tdlib/telegram-bot-api.git
         cd telegram-bot-api
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release ..
+        cmake -DCMAKE_BUILD_TYPE=Release \
+              -DOPENSSL_USE_STATIC_LIBS=TRUE \
+              -DZLIB_USE_STATIC_LIBS=TRUE \
+              -DCMAKE_EXE_LINKER_FLAGS="-static" \
+              ..
         cmake --build .
         zip telegram-bot-api.zip telegram-bot-api
+
+    - name: Verify static binary
+      run: |
+        file telegram-bot-api/build/telegram-bot-api
+        ldd telegram-bot-api/build/telegram-bot-api || true
 
     - name: Set Release Info
       id: release
@@ -31,7 +40,7 @@ jobs:
 
     - name: Automatic Release
       uses: marvinpinto/action-automatic-releases@latest
-      with: 
+      with:
         repo_token: "${{ secrets.GITHUB_TOKEN }}"
         automatic_release_tag: "${{ env.TAG }}"
         prerelease: false
